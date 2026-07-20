@@ -14,7 +14,8 @@ const socket = io(SOCKET_URL, {
   path: '/socket.io/',
   forceNew: true,
   upgrade: true,
-  rememberUpgrade: true
+  rememberUpgrade: true,
+  withCredentials: true
 });
 
 export default socket;
