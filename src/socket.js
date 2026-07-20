@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 
-// Use the same origin as the page (para same domain at port)
-const SOCKET_URL = window.location.origin; // 'https://creamyxo.onrender.com' sa production
+// Use the same origin as the page
+const SOCKET_URL = window.location.origin;
 
 const socket = io(SOCKET_URL, {
   autoConnect: false,
@@ -11,9 +11,10 @@ const socket = io(SOCKET_URL, {
   reconnectionDelayMax: 5000,
   timeout: 20000,
   transports: ['websocket', 'polling'],
-  // Important for HTTPS
-  secure: true,
-  rejectUnauthorized: false
+  path: '/socket.io/',
+  forceNew: true,
+  upgrade: true,
+  rememberUpgrade: true
 });
 
 export default socket;

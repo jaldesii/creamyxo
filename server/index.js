@@ -16,7 +16,13 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }, maxHttpBufferSize: Infinity, transports: ['websocket', 'polling'] });
+const io = new Server(server, { 
+  cors: { origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }, 
+  maxHttpBufferSize: Infinity, 
+  transports: ['websocket', 'polling'],
+  allowEIO3: true,
+  path: '/socket.io/'
+});
 
 // ============================================= FILE PATHS =============================================
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -462,14 +468,22 @@ app.get('/api/export/freedom-wall', (req, res) => {
   res.send(['Username,Message,Images,Audio,Likes,Comments,Time', ...freedomWallPosts.map(p => `${p.username},"${(p.message || '').replace(/"/g,'""')}",${p.images ? p.images.length : 0},${p.audio ? 'Yes' : 'No'},${p.likes},${p.commentCount || 0},${p.timestamp}`)].join('\n'));
 });
 
-// Since nasa server/ folder ka, kailangan umakyat ng isang level
+// ============================================= SERVE STATIC FILES =============================================
+// Serve static files from the dist folder
 app.use(express.static(path.join(__dirname, '..', 'dist')));
 
-app.get('*', (req, res) => {
+// FIXED: Catch-all route using regex pattern (para iwas sa path-to-regexp error)
+app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
 });
 
 // ============================================= START SERVER =============================================
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => { console.log(`🚀 Cremyxo server running on port ${PORT}`); console.log(`📁 Data directory: ${DATA_DIR}`); });
+server.listen(PORT, () => { 
+  console.log(`🚀 Cremyxo server running on port ${PORT}`); 
+  console.log(`📁 Data directory: ${DATA_DIR}`);
+  console.log(`🌐 Server URL: http://localhost:${PORT}`);
+});
 
+// Export for testing
+export { app, server, io };
