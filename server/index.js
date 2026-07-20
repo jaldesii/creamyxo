@@ -462,10 +462,11 @@ app.get('/api/export/freedom-wall', (req, res) => {
   res.send(['Username,Message,Images,Audio,Likes,Comments,Time', ...freedomWallPosts.map(p => `${p.username},"${(p.message || '').replace(/"/g,'""')}",${p.images ? p.images.length : 0},${p.audio ? 'Yes' : 'No'},${p.likes},${p.commentCount || 0},${p.timestamp}`)].join('\n'));
 });
 
-app.use(express.static(path.join(__dirname, 'dist')));
+// Since nasa server/ folder ka, kailangan umakyat ng isang level
+app.use(express.static(path.join(__dirname, '..', 'dist')));
 
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+  res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
 });
 
 // ============================================= START SERVER =============================================
