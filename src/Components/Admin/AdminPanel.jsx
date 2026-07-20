@@ -4,9 +4,10 @@ import { jsPDF } from 'jspdf';
 import socket from '../../socket';
 import './AdminPanel.scss';
 
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:3001'
-  : `http://${window.location.hostname}:3001`;
+// =============================================
+// FIXED: API CONFIGURATION - Works on both localhost and production
+// =============================================
+const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
 
 const AdminPanel = () => {
   const [data, setData] = useState({ users: [], rooms: [], waitingCount: 0, totalOnline: 0, totalUsers: 0, messageLog: [], serverUptime: 0, totalMessages: 0, totalVoiceMessages: 0, totalVoiceDuration: 0, reportedUsers: [], totalFWPosts: 0, totalFWStories: 0, totalFWComments: 0, freedomWallPosts: [] });
@@ -42,7 +43,10 @@ const AdminPanel = () => {
   }, []);
 
   useEffect(() => { 
-    socket.connect(); 
+    // Connect socket
+    if (!socket.connected) {
+      socket.connect();
+    }
     socket.emit('set-name', { name: 'ADMIN' }); 
     socket.on('admin-update', (u) => setData(prev => ({ ...prev, ...u }))); 
     
@@ -103,10 +107,22 @@ const AdminPanel = () => {
     if (clearPassword !== 'admin123') { alert('Invalid password!'); return; }
     setClearing(true);
     try {
-      const response = await fetch(`${API_URL}/api/clear-data`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: clearPassword }) });
+      const response = await fetch(`${API_URL}/api/clear-data`, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ password: clearPassword }) 
+      });
       const result = await response.json();
-      if (result.success) { setBroadcastRequests([]); setShowClearModal(false); setClearPassword(''); alert('All data cleared successfully!'); }
-    } catch (error) { console.error('Clear error:', error); alert('Failed to clear data.'); }
+      if (result.success) { 
+        setBroadcastRequests([]); 
+        setShowClearModal(false); 
+        setClearPassword(''); 
+        alert('All data cleared successfully!'); 
+      }
+    } catch (error) { 
+      console.error('Clear error:', error); 
+      alert('Failed to clear data.'); 
+    }
     setClearing(false);
   };
 
