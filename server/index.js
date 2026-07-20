@@ -9,7 +9,6 @@ import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import fs from 'fs';
-import path from 'path';
 
 const app = express();
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'] }));
