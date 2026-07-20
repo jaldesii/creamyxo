@@ -1,10 +1,9 @@
 import { io } from 'socket.io-client';
 
-// Use the same origin as the page
 const SOCKET_URL = window.location.origin;
 
 const socket = io(SOCKET_URL, {
-  autoConnect: false,
+  autoConnect: true,
   reconnection: true,
   reconnectionAttempts: 10,
   reconnectionDelay: 1000,
@@ -12,7 +11,7 @@ const socket = io(SOCKET_URL, {
   timeout: 20000,
   transports: ['websocket', 'polling'],
   path: '/socket.io/',
-  forceNew: true,
+  forceNew: false,
   upgrade: true,
   rememberUpgrade: true,
   withCredentials: true

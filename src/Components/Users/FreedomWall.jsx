@@ -1,29 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Send, MessageSquare, User, Trash2, Heart, Clock, Sparkles, MoreVertical, X, Mic, Play, Pause, Square, Camera, Plus, ChevronLeft, ChevronRight, Image, Eye, History, Hash, Calendar, MessageCircle } from 'lucide-react';
-import { io } from 'socket.io-client';
+import socket from '../../socket';
 import './FreedomWall.scss';
 
 // =============================================
-// FIXED: API CONFIGURATION - Works on both localhost and production
-// =============================================
-// =============================================
-// API CONFIGURATION - Fixed for mobile
+// API CONFIGURATION - Works on both localhost and production
 // =============================================
 const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
-
-let socket;
-try {
-  socket = io(API_URL, { 
-    transports: ['websocket', 'polling'],
-    path: '/socket.io/',
-    reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 1000
-  });
-} catch (err) { 
-  console.warn('Socket connection failed, using HTTP only'); 
-}
 
 // =============================================
 // SECURITY: Content Sanitization Functions
@@ -95,65 +79,104 @@ const FreedomWall = () => {
   const audioChunksRef = useRef([]);
   const audioRef = useRef(new Audio());
   const storyTimerRef = useRef(null);
+  const isMountedRef = useRef(true);
 
+  // =============================================
+  // SOCKET EVENT LISTENERS
+  // =============================================
   useEffect(() => {
+    // Connect socket if not connected
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    const onInit = (data) => { 
+      if (!isMountedRef.current) return;
+      setPosts(data.posts || []); 
+      updateLikedFromServer(data.posts || []); 
+      setIsLoading(false); 
+    };
+
+    const onNewPost = (newPost) => { 
+      if (!isMountedRef.current) return;
+      setPosts(prev => { 
+        if (prev.find(p => p.id === newPost.id)) return prev; 
+        return [newPost, ...prev]; 
+      }); 
+    };
+
+    const onPostUpdated = (data) => { 
+      if (!isMountedRef.current) return;
+      setPosts(prev => prev.map(post => 
+        post.id === data.id ? { ...post, likes: data.likes, likedBy: data.likedBy } : post
+      )); 
+    };
+
+    const onPostDeleted = (data) => { 
+      if (!isMountedRef.current) return;
+      setPosts(prev => prev.filter(post => post.id !== data.id)); 
+      setShowDeleteModal(null); 
+    };
+
+    const onCleared = () => { 
+      if (!isMountedRef.current) return;
+      setPosts([]); 
+    };
+
+    const onNewStory = (newStory) => { 
+      if (!isMountedRef.current) return;
+      setStories(prev => [newStory, ...prev.filter(s => s.id !== newStory.id)]); 
+    };
+
+    const onStoryDeleted = (data) => { 
+      if (!isMountedRef.current) return;
+      setStories(prev => prev.filter(s => s.id !== data.id)); 
+    };
+
+    const onNewComment = ({ postId, comment }) => {
+      if (!isMountedRef.current) return;
+      setComments(prev => ({ ...prev, [postId]: [...(prev[postId] || []), comment] }));
+      setPosts(prev => prev.map(p => 
+        p.id === postId ? { ...p, commentCount: (p.commentCount || 0) + 1 } : p
+      ));
+    };
+
+    const onCommentDeleted = ({ postId, commentId }) => {
+      if (!isMountedRef.current) return;
+      setComments(prev => ({ ...prev, [postId]: (prev[postId] || []).filter(c => c.id !== commentId) }));
+      setPosts(prev => prev.map(p => 
+        p.id === postId ? { ...p, commentCount: Math.max(0, (p.commentCount || 0) - 1) } : p
+      ));
+    };
+
+    // Register all socket events
+    socket.on('freedom-wall-init', onInit);
+    socket.on('freedom-wall-new-post', onNewPost);
+    socket.on('freedom-wall-post-updated', onPostUpdated);
+    socket.on('freedom-wall-post-deleted', onPostDeleted);
+    socket.on('freedom-wall-cleared', onCleared);
+    socket.on('freedom-wall-new-story', onNewStory);
+    socket.on('freedom-wall-story-deleted', onStoryDeleted);
+    socket.on('freedom-wall-new-comment', onNewComment);
+    socket.on('freedom-wall-comment-deleted', onCommentDeleted);
+
+    // Fetch initial data
     fetchPosts(); 
     fetchStories();
-    
-    if (socket) {
-      socket.on('freedom-wall-init', (data) => { 
-        setPosts(data.posts || []); 
-        updateLikedFromServer(data.posts || []); 
-        setIsLoading(false); 
-      });
-      socket.on('freedom-wall-new-post', (newPost) => { 
-        setPosts(prev => { 
-          if (prev.find(p => p.id === newPost.id)) return prev; 
-          return [newPost, ...prev]; 
-        }); 
-      });
-      socket.on('freedom-wall-post-updated', (data) => { 
-        setPosts(prev => prev.map(post => 
-          post.id === data.id ? { ...post, likes: data.likes, likedBy: data.likedBy } : post
-        )); 
-      });
-      socket.on('freedom-wall-post-deleted', (data) => { 
-        setPosts(prev => prev.filter(post => post.id !== data.id)); 
-        setShowDeleteModal(null); 
-      });
-      socket.on('freedom-wall-cleared', () => setPosts([]));
-      socket.on('freedom-wall-new-story', (newStory) => { 
-        setStories(prev => [newStory, ...prev.filter(s => s.id !== newStory.id)]); 
-      });
-      socket.on('freedom-wall-story-deleted', (data) => { 
-        setStories(prev => prev.filter(s => s.id !== data.id)); 
-      });
-      socket.on('freedom-wall-new-comment', ({ postId, comment }) => {
-        setComments(prev => ({ ...prev, [postId]: [...(prev[postId] || []), comment] }));
-        setPosts(prev => prev.map(p => 
-          p.id === postId ? { ...p, commentCount: (p.commentCount || 0) + 1 } : p
-        ));
-      });
-      socket.on('freedom-wall-comment-deleted', ({ postId, commentId }) => {
-        setComments(prev => ({ ...prev, [postId]: (prev[postId] || []).filter(c => c.id !== commentId) }));
-        setPosts(prev => prev.map(p => 
-          p.id === postId ? { ...p, commentCount: Math.max(0, (p.commentCount || 0) - 1) } : p
-        ));
-      });
-    }
-    
+
+    // Cleanup
     return () => {
-      if (socket) { 
-        socket.off('freedom-wall-init'); 
-        socket.off('freedom-wall-new-post'); 
-        socket.off('freedom-wall-post-updated'); 
-        socket.off('freedom-wall-post-deleted'); 
-        socket.off('freedom-wall-cleared'); 
-        socket.off('freedom-wall-new-story'); 
-        socket.off('freedom-wall-story-deleted'); 
-        socket.off('freedom-wall-new-comment'); 
-        socket.off('freedom-wall-comment-deleted'); 
-      }
+      isMountedRef.current = false;
+      socket.off('freedom-wall-init', onInit);
+      socket.off('freedom-wall-new-post', onNewPost);
+      socket.off('freedom-wall-post-updated', onPostUpdated);
+      socket.off('freedom-wall-post-deleted', onPostDeleted);
+      socket.off('freedom-wall-cleared', onCleared);
+      socket.off('freedom-wall-new-story', onNewStory);
+      socket.off('freedom-wall-story-deleted', onStoryDeleted);
+      socket.off('freedom-wall-new-comment', onNewComment);
+      socket.off('freedom-wall-comment-deleted', onCommentDeleted);
+      
       if (audioRef.current) { 
         audioRef.current.pause(); 
         audioRef.current.src = ''; 
@@ -166,7 +189,7 @@ const FreedomWall = () => {
     try { 
       const res = await fetch(`${API_URL}/api/freedom-wall/stories`); 
       const data = await res.json(); 
-      if (data.success) setStories(data.stories || []); 
+      if (data.success && isMountedRef.current) setStories(data.stories || []); 
     } catch (err) { 
       console.error('Error fetching stories:', err); 
     } 
@@ -184,14 +207,14 @@ const FreedomWall = () => {
     try { 
       const response = await fetch(`${API_URL}/api/freedom-wall/posts`); 
       const data = await response.json(); 
-      if (data.success) { 
+      if (data.success && isMountedRef.current) { 
         setPosts(data.posts || []); 
         updateLikedFromServer(data.posts || []); 
       } 
     } catch (error) { 
       console.error('Error fetching posts:', error); 
     } finally { 
-      setIsLoading(false); 
+      if (isMountedRef.current) setIsLoading(false); 
     } 
   };
 
