@@ -7,7 +7,7 @@
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview --host",
-    "start": "node server.js",
+    "start": "node server/index.js",
     "lint": "eslint ."
   },
   "dependencies": {
